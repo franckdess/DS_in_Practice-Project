@@ -99,3 +99,54 @@ def plot_dist(df, feature):
     plt.xlabel(feature, fontsize='x-large')
     plt.gcf().set_size_inches(18, 5)
     plt.show()
+    
+def update_feature(df, feature, percentage, threshold):
+    """ This function updates the column feature by +- percentage
+        for all observations of df where the life expectancy is
+        below threshold. """
+    # Get observations where life expectation is below threshold
+    life_exp_below_th = df[df['Life expectancy'] < threshold]
+    indices = life_exp_below_th.index
+    # Increase feature by percentage
+    new_values = life_exp_below_th[feature].apply(lambda x: x*(1+percentage)).values
+    # Update the life_expectancy data frame with the new values
+    life_expectancy_updated = df.copy()
+    life_expectancy_updated.at[indices, feature] = new_values
+    return life_expectancy_updated
+
+def predict_new_le(df, threshold, model):
+    """ This functions predict the new life expectancy of all
+        observations of df where the life expectancy was below
+        threshold using the model model. """
+    ids = df['id'].values
+    # Get the observations where the life expectancy is below threshold
+    df = df.drop(['Continent', 'id'], axis=1)
+    indices = df[df['Life expectancy'] < threshold].index
+    below_th = df.loc[indices]
+    below_th_x = below_th.drop(['Life expectancy'], axis=1)
+    X = below_th_x.values
+    y_pred = model.predict(X)
+    # Set back the values in the dataframe
+    df.at[indices, 'Life expectancy'] = y_pred
+    df['id'] = ids
+    return df
+
+def get_life_exp_pred_results(original_df, increases_per_feature, indices, threshold, model):
+    """ This function returns the average life expectancy over all countries that
+        had a life expectancy below threshold and the number of countries that obtained
+        a life expectancy above threshold, after the improvements of the features in
+        the dictionary increases_per_feature. """
+    averages_le = []
+    nb_countries = [] 
+    for key in increases_per_feature:
+        avg_key = []
+        nb_countries_key = []
+        for i in increases_per_feature[key]:
+            updated_df = update_feature(original_df, key, i, threshold)
+            predicted_df = predict_new_le(updated_df, threshold, model)
+            life_exp = predicted_df.loc[indices]
+            avg_key.append(np.mean(life_exp['Life expectancy'].values))
+            nb_countries_key.append(life_exp[life_exp['Life expectancy'] >= threshold].shape[0]) 
+        averages_le.append(avg_key)
+        nb_countries.append(nb_countries_key)
+    return averages_le, nb_countries
