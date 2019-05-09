@@ -28,6 +28,8 @@ def get_nan_columns(df, country_indexed=False):
     return nan_columns
 
 def show_map(df, feature, legend):
+    """ This function displays the distribution of a given feature on
+        a world map. """
     # Geojson file
     world_geo = r'Data/world-countries.json'
     # Create a plain world map
@@ -49,6 +51,7 @@ def show_map(df, feature, legend):
     return world_map
 
 def plot_corr_map(df):
+    """ This function plots the correlation map of a dataframe. """
     fig = plt.figure(figsize=(10, 10))
     ax = fig.add_subplot(111)
     cax = ax.matshow(df.corr(), cmap='BuPu', vmin=-1, vmax=1)
@@ -62,6 +65,8 @@ def plot_corr_map(df):
     plt.show()
     
 def scatter_plot(df, scatter_x, scatter_y, x_label, y_label, x_log=False):
+    """ This function plots the scatter plot of the dataframe given
+        the x values and the y values. """
     continents = df['Continent'].values
     cdict = {'Europe': 'royalblue', 'America': 'red', 'Africa': 'orange', 'Asia': 'limegreen', 'Oceania': 'violet'}
     for g in np.unique(continents):
@@ -75,9 +80,42 @@ def scatter_plot(df, scatter_x, scatter_y, x_label, y_label, x_log=False):
     plt.gcf().set_size_inches(18, 8)
     plt.show()
     
+def plot_distr_by_cont(df, feature, title):
+    """ This functions plots on subplots the global distribution of a given
+        feature and the distribution of that feature per continent. """
+    fig, axs = plt.subplots(3, 2, squeeze=False)
+    mean = df[feature].mean()
+    median = df[feature].median()
+    mode = df[feature].mode().get_values()[0]
+    sns.distplot(df[feature], ax=axs[0][0]).set_title('Global {}'.format(feature))
+    axs[0][0].axvline(mean, color='r', linestyle='--', label='mean')
+    axs[0][0].axvline(median, color='g', linestyle='-', label='median')
+    axs[0][0].axvline(mode, color='b', linestyle='-', label='mode')
+    axs[0][0].legend()
+    continents = np.unique(df['Continent'].values)
+    i, j = 0, 1
+    for cont in (continents):
+        mean = df[df['Continent'] == cont][feature].mean()
+        median = df[df['Continent'] == cont][feature].median()
+        mode = df[df['Continent'] == cont][feature].mode().get_values()[0]
+        sns.distplot(df[df['Continent'] == cont][feature],
+                     ax=axs[i][j]).set_title('{} in {}'.format(feature, cont))
+        axs[i][j].axvline(mean, color='r', linestyle='--', label='mean')
+        axs[i][j].axvline(median, color='g', linestyle='-', label='median')
+        axs[i][j].axvline(mode, color='b', linestyle='-', label='mode')
+        axs[i][j].legend()
+        if(j%2 == 1):
+            i += 1
+            j = 0
+        else:
+            j += 1
+    fig.suptitle('Life expectancy distributions', fontsize='x-large')
+    plt.subplots_adjust(hspace=0.5)
+    plt.gcf().set_size_inches(18, 14)
+    plt.show()
+    
 def plot_pred(y_test, y_pred, title, score):
-    """ Plot the predicted values y_pred against
-        the test values y_test. """
+    """ Plot the predicted values y_pred against the test values y_test. """
     plt.scatter(y_test, y_pred, c='royalblue', edgecolors='white', alpha=0.6, s=400)
     plt.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], 'r--', lw=4, color='crimson')
     plt.title(title + (' - Score: {:.2f}%'.format(score*100)), fontsize='x-large')
@@ -87,6 +125,7 @@ def plot_pred(y_test, y_pred, title, score):
     plt.show()
     
 def plot_features_coefs(features, weights, title):
+    """ This function plot the feature weights obtained by a regression."""
     colors = ['crimson' if c < 0 else 'royalblue' for c in np.sort(weights)]
     plt.barh(features[np.argsort(weights)], np.sort(weights), color=colors)
     plt.grid(True)
@@ -99,11 +138,10 @@ def update_feature(original_df, indices, feature, percentage, threshold):
         for all observations of df where the life expectancy is
         below threshold. """
     # Get observations where life expectation is below threshold
-    original_df = original_df.loc[indices]
+    original_df_updated = original_df.loc[indices]
     # Increase feature by percentage
-    new_values = original_df[feature].apply(lambda x: x*(1+percentage)).values
+    new_values = original_df_updated[feature].apply(lambda x: x*(1+percentage)).values
     # Update the life_expectancy data frame with the new values
-    original_df_updated = original_df.copy()
     original_df_updated.at[indices, feature] = new_values
     return original_df_updated
 
@@ -113,9 +151,10 @@ def predict_new_le(X, original_df, threshold, model, indices, ids):
         threshold using the model model. """
     y_pred = model.predict(X)
     # Set back the values in the dataframe
-    original_df.at[indices, 'Life expectancy'] = y_pred
-    original_df['id'] = ids
-    return original_df
+    original_df_updated = original_df
+    original_df_updated.at[indices, 'Life expectancy'] = y_pred
+    original_df_updated['id'] = ids
+    return original_df_updated
 
 def get_life_exp_pred_results(original_df, increases_per_feature, indices, threshold, model, ids, scaler):
     """ This function returns the average life expectancy over all countries that
@@ -140,21 +179,21 @@ def get_life_exp_pred_results(original_df, increases_per_feature, indices, thres
     return averages_le, nb_countries
 
 def plot_features_coefs_comp(features, weights1, weights2, title):
+    """ This function plots the comparison of feature weights obtained
+        with the same regression on different datasets. """
     fig, axs = plt.subplots(1, 2, sharey=True)
     fig.subplots_adjust(hspace=0)
     colors1 = ['crimson' if c < 0 else 'royalblue' for c in np.sort(weights1)]
     colors2 = ['crimson' if c < 0 else 'royalblue' for c in weights2[np.argsort(weights1)]]
     x_max = max(max(weights1), max(weights2))
-    x_min = min(min(weights1), min(weights2))               
-    
+    x_min = min(min(weights1), min(weights2))                
     axs[0].barh(features[np.argsort(weights1)], np.sort(weights1), color=colors1)
     axs[0].grid(True)
     axs[0].set_title('Whole dataset')
     axs[1].barh(features[np.argsort(weights1)], weights2[np.argsort(weights1)], color=colors2)
     axs[1].grid(True)
     axs[1].set_title('Reduced dataset')
-    fig.suptitle(title, fontsize='x-large')
-    
+    fig.suptitle(title, fontsize='x-large') 
     plt.gcf().set_size_inches(16, 8)
     plt.show()
     
