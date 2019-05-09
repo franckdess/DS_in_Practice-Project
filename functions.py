@@ -94,12 +94,6 @@ def plot_features_coefs(features, weights, title):
     plt.gcf().set_size_inches(18, 8)
     plt.show()
     
-def plot_dist(df, feature): 
-    sns.distplot(df[feature])
-    plt.xlabel(feature, fontsize='x-large')
-    plt.gcf().set_size_inches(18, 5)
-    plt.show()
-    
 def update_feature(original_df, indices, feature, percentage, threshold):
     """ This function updates the column feature by +- percentage
         for all observations of df where the life expectancy is
@@ -175,9 +169,10 @@ def plot_resulting_av_le(dict_impr, values, avg, avg_combined, title, threshold,
     plt.axhline(y=y_, linestyle='--', c='black')
     plt.axvline(x=x_, linestyle='--', c='black')
     plt.xticks(np.sort(np.append(np.arange(0, 1.1, 0.1), [x_])))
-    plt.yticks(np.sort(np.append(np.arange(56, 71, 2), [y_])))
+    plt.yticks(np.sort(np.append(np.arange(int(np.amin(avg_combined)), int(np.amax(avg_combined)), 2), [y_])))
     plt.grid()
-    plt.legend(fontsize='large')
+    plt.title(title)
+    plt.legend(fontsize='x-large', loc=1)
     plt.show()
 
 def plot_resulting_nb_countries_le(dict_impr, values, nb_c, nb_c_combined, title, threshold, x_, y_):
@@ -194,5 +189,6 @@ def plot_resulting_nb_countries_le(dict_impr, values, nb_c, nb_c_combined, title
     plt.xticks(np.sort(np.append(np.arange(0, 1.1, 0.1), [x_])))
     plt.yticks(np.sort(np.append(np.arange(0, 51, 10), [y_])))
     plt.grid()
-    plt.legend(fontsize='large', loc=1)
+    plt.title(title)
+    plt.legend(fontsize='x-large', loc=1)
     plt.show()
