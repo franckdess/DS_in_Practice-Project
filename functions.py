@@ -100,38 +100,30 @@ def plot_dist(df, feature):
     plt.gcf().set_size_inches(18, 5)
     plt.show()
     
-def update_feature(df, feature, percentage, threshold):
+def update_feature(original_df, indices, feature, percentage, threshold):
     """ This function updates the column feature by +- percentage
         for all observations of df where the life expectancy is
         below threshold. """
     # Get observations where life expectation is below threshold
-    life_exp_below_th = df[df['Life expectancy'] < threshold]
-    indices = life_exp_below_th.index
+    original_df = original_df.loc[indices]
     # Increase feature by percentage
-    new_values = life_exp_below_th[feature].apply(lambda x: x*(1+percentage)).values
+    new_values = original_df[feature].apply(lambda x: x*(1+percentage)).values
     # Update the life_expectancy data frame with the new values
-    life_expectancy_updated = df.copy()
-    life_expectancy_updated.at[indices, feature] = new_values
-    return life_expectancy_updated
+    original_df_updated = original_df.copy()
+    original_df_updated.at[indices, feature] = new_values
+    return original_df_updated
 
-def predict_new_le(df, threshold, model):
+def predict_new_le(X, original_df, threshold, model, indices, ids):
     """ This functions predict the new life expectancy of all
         observations of df where the life expectancy was below
         threshold using the model model. """
-    ids = df['id'].values
-    # Get the observations where the life expectancy is below threshold
-    df = df.drop(['Continent', 'id'], axis=1)
-    indices = df[df['Life expectancy'] < threshold].index
-    below_th = df.loc[indices]
-    below_th_x = below_th.drop(['Life expectancy'], axis=1)
-    X = below_th_x.values
     y_pred = model.predict(X)
     # Set back the values in the dataframe
-    df.at[indices, 'Life expectancy'] = y_pred
-    df['id'] = ids
-    return df
+    original_df.at[indices, 'Life expectancy'] = y_pred
+    original_df['id'] = ids
+    return original_df
 
-def get_life_exp_pred_results(original_df, increases_per_feature, indices, threshold, model):
+def get_life_exp_pred_results(original_df, increases_per_feature, indices, threshold, model, ids, scaler):
     """ This function returns the average life expectancy over all countries that
         had a life expectancy below threshold and the number of countries that obtained
         a life expectancy above threshold, after the improvements of the features in
@@ -142,11 +134,65 @@ def get_life_exp_pred_results(original_df, increases_per_feature, indices, thres
         avg_key = []
         nb_countries_key = []
         for i in increases_per_feature[key]:
-            updated_df = update_feature(original_df, key, i, threshold)
-            predicted_df = predict_new_le(updated_df, threshold, model)
+            updated_df = update_feature(original_df, indices, key, i, threshold)
+            X = updated_df.drop(['Life expectancy', 'id', 'Continent'], axis=1).values
+            X = scaler.transform(X)
+            predicted_df = predict_new_le(X, updated_df, threshold, model, indices, ids)
             life_exp = predicted_df.loc[indices]
             avg_key.append(np.mean(life_exp['Life expectancy'].values))
             nb_countries_key.append(life_exp[life_exp['Life expectancy'] >= threshold].shape[0]) 
         averages_le.append(avg_key)
         nb_countries.append(nb_countries_key)
     return averages_le, nb_countries
+
+def plot_features_coefs_comp(features, weights1, weights2, title):
+    fig, axs = plt.subplots(1, 2, sharey=True)
+    fig.subplots_adjust(hspace=0)
+    colors1 = ['crimson' if c < 0 else 'royalblue' for c in np.sort(weights1)]
+    colors2 = ['crimson' if c < 0 else 'royalblue' for c in weights2[np.argsort(weights1)]]
+    x_max = max(max(weights1), max(weights2))
+    x_min = min(min(weights1), min(weights2))               
+    
+    axs[0].barh(features[np.argsort(weights1)], np.sort(weights1), color=colors1)
+    axs[0].grid(True)
+    axs[0].set_title('Whole dataset')
+    axs[1].barh(features[np.argsort(weights1)], weights2[np.argsort(weights1)], color=colors2)
+    axs[1].grid(True)
+    axs[1].set_title('Reduced dataset')
+    fig.suptitle(title, fontsize='x-large')
+    
+    plt.gcf().set_size_inches(16, 8)
+    plt.show()
+    
+def plot_resulting_av_le(dict_impr, values, avg, avg_combined, title, threshold, x_, y_):
+    """ This function plot the results for average updated life expectancy """
+    for i, key in enumerate(dict_impr):
+        plt.plot(values, avg[i], label=key)
+    plt.plot(values, avg_combined, label='All combined', c='red')
+    plt.xlabel('Increase/decrease percentage of positive/negative correlated features', fontsize='x-large')
+    plt.ylabel('Average life expectancy of countries initially below {}'.format(threshold), fontsize='x-large')
+    plt.gcf().set_size_inches(18, 10)
+    plt.axhline(y=y_, linestyle='--', c='black')
+    plt.axvline(x=x_, linestyle='--', c='black')
+    plt.xticks(np.sort(np.append(np.arange(0, 1.1, 0.1), [x_])))
+    plt.yticks(np.sort(np.append(np.arange(56, 71, 2), [y_])))
+    plt.grid()
+    plt.legend(fontsize='large')
+    plt.show()
+
+def plot_resulting_nb_countries_le(dict_impr, values, nb_c, nb_c_combined, title, threshold, x_, y_):
+    """ This function plots the result for the number of countries that
+        went above the threshold. """
+    for i, key in enumerate(dict_impr):
+        plt.plot(values, nb_c[i], label=key)
+    plt.plot(values, nb_c_combined, label='All combined', c='red')
+    plt.xlabel('Increase/decrease percentage of positive/negative correlated features', fontsize='x-large')
+    plt.ylabel('Number of countries where life expectancy went above {}'.format(threshold), fontsize='x-large')
+    plt.gcf().set_size_inches(18, 10)
+    plt.axhline(y=y_, linestyle='--', c='black')
+    plt.axvline(x=x_, linestyle='--', c='black')
+    plt.xticks(np.sort(np.append(np.arange(0, 1.1, 0.1), [x_])))
+    plt.yticks(np.sort(np.append(np.arange(0, 51, 10), [y_])))
+    plt.grid()
+    plt.legend(fontsize='large', loc=1)
+    plt.show()
